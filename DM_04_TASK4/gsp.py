@@ -45,12 +45,14 @@ def isSubsequenceRecursive(mainSequence, subSequenceClone, start=0):
         return True
     # retrieves element of the subsequence and removes is from subsequence
     firstElem = set(subSequenceClone.pop(0))
-    # Search for the first itemset...
-    for i in range(start, len(mainSequence)):
-        if (set(mainSequence[i]).issuperset(firstElem)):
-            # and recurse
-            return isSubsequenceRecursive(mainSequence, subSequenceClone, i + 1)
-    return False
+    return next(
+        (
+            isSubsequenceRecursive(mainSequence, subSequenceClone, i + 1)
+            for i in range(start, len(mainSequence))
+            if (set(mainSequence[i]).issuperset(firstElem))
+        ),
+        False,
+    )
 
 
 # ### Size of sequences
@@ -96,16 +98,14 @@ def generateCandidatesForPair(cand1, cand2):
     else:
         cand2Clone[-1] = cand2Clone[-1][:-1]
 
-    # if the result is not the same, then we dont need to join
-    if not cand1Clone == cand2Clone:
+    if cand1Clone != cand2Clone:
         return []
+    newCandidate = copy.deepcopy(cand1)
+    if (len(cand2[-1]) == 1):
+        newCandidate.append(cand2[-1])
     else:
-        newCandidate = copy.deepcopy(cand1)
-        if (len(cand2[-1]) == 1):
-            newCandidate.append(cand2[-1])
-        else:
-            newCandidate[-1].extend(cand2[-1][-1])
-        return newCandidate
+        newCandidate[-1].extend(cand2[-1][-1])
+    return newCandidate
 
 
 # #### For a set of candidates (of the last level):
@@ -123,10 +123,10 @@ def generateCandidates(lastLevelCandidates):
         return result
     else:
         candidates = []
-        for i in range(0, len(lastLevelCandidates)):
-            for j in range(0, len(lastLevelCandidates)):
+        for i in range(len(lastLevelCandidates)):
+            for j in range(len(lastLevelCandidates)):
                 newCand = generateCandidatesForPair(lastLevelCandidates[i], lastLevelCandidates[j])
-                if (not newCand == []):
+                if newCand != []:
                     candidates.append(newCand)
         candidates.sort()
         return candidates
@@ -180,20 +180,25 @@ Returns:
 def apriori(dataset, minSupport, verbose=False):
     global numberOfCountingOperations
     numberOfCountingOperations = 0
-    Overall = []
-    itemsInDataset = sorted(set([item for sublist1 in dataset for sublist2 in sublist1 for item in sublist2]))
+    itemsInDataset = sorted(
+        {
+            item
+            for sublist1 in dataset
+            for sublist2 in sublist1
+            for item in sublist2
+        }
+    )
+
     singleItemSequences = [[[item]] for item in itemsInDataset]
     singleItemCounts = [(i, countSupport(dataset, i)) for i in singleItemSequences if
                         countSupport(dataset, i) >= minSupport]
-    Overall.append(singleItemCounts)
+    Overall = [singleItemCounts]
     if verbose:
         print
-        "Result, lvl 1: " + str(Overall[0])
+        f"Result, lvl 1: {str(Overall[0])}"
 
     k = 1
-    while (True):
-        if not Overall[k - 1]:
-            break
+    while Overall[k - 1]:
         # 1. Candidate generation
         candidatesLastLevel = [x[0] for x in Overall[k - 1]]
         candidatesGenerated = generateCandidates(candidatesLastLevel)
@@ -204,11 +209,11 @@ def apriori(dataset, minSupport, verbose=False):
         candidatesCounts = [(i, countSupport(dataset, i)) for i in candidatesPruned]
         resultLvl = [(i, count) for (i, count) in candidatesCounts if (count >= minSupport)]
         if verbose:
-            print("Candidates generated, lvl " + str(k + 1) + ": " + str(candidatesGenerated))
-            print("Candidates pruned, lvl " + str(k + 1) + ": " + str(candidatesPruned))
-            print("Result, lvl " + str(k + 1) + ": " + str(resultLvl))
+            print(f"Candidates generated, lvl {str(k + 1)}: {str(candidatesGenerated)}")
+            print(f"Candidates pruned, lvl {str(k + 1)}: {candidatesPruned}")
+            print(f"Result, lvl {str(k + 1)}: {resultLvl}")
         Overall.append(resultLvl)
-        k = k + 1
+        k += 1
     # "flatten" Overall
     Overall = Overall[:-1]
     Overall = [item for sublist in Overall for item in sublist]
